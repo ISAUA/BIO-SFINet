@@ -34,8 +34,13 @@ data:
   # 预处理超参数
   parameters:
     n_top_genes: 3000
+    rna_min_cells: 3
+    rna_target_sum: 1e4
     n_global_peaks: 50000
     n_final_peaks: 30000
+    atac_min_cells: 50
+    atac_target_sum: 1e4
+    tfidf_eps: 1e-6
     tss_window: 100000
     knn_k: 10
 
@@ -46,10 +51,16 @@ model:
   name: "SFNet"
   rna_in_dim: 3000
   hidden_dim: 512
+  rna_n_heads: 4
+  rna_dropout: 0.1
+  atac_dropout: 0.1
   n_heads: 4
   dropout: 0.1
   grid_size: 128
   latent_dim: 50
+  sfib_dim: 128
+  proj_hidden_dim: 64
+  proj_output_dim: 64
 
 # ------------------------------------------
 # 3. 训练策略参数
@@ -61,5 +72,8 @@ train:
   weight_decay: 1e-4
   lambda_rna: 1.0
   lambda_atac: 1.0
-  lambda_fre: 0.1
+  lambda_clip: 0.1
+  clip_temperature: 0.1
+  save_every: 50
+  device: "cuda"
   log_interval: 10

@@ -11,13 +11,19 @@ class BioSFINet(nn.Module):
         """
         super().__init__()
         
-        rna_dim = config['model']['rna_in_dim'] # 3000
-        hidden_dim = config['model']['hidden_dim'] # 512
-        sfib_dim = 128
+        model_cfg = config['model']
+        rna_dim = model_cfg['rna_in_dim']
+        hidden_dim = model_cfg['hidden_dim']
+        sfib_dim = model_cfg.get('sfib_dim', 128)
+        rna_heads = model_cfg.get('rna_n_heads', model_cfg.get('n_heads', 4))
+        rna_dropout = model_cfg.get('rna_dropout', model_cfg.get('dropout', 0.1))
+        atac_dropout = model_cfg.get('atac_dropout', model_cfg.get('dropout', 0.1))
+        proj_hidden = model_cfg.get('proj_hidden_dim', 64)
+        proj_output = model_cfg.get('proj_output_dim', 64)
         
         # 1. Encoders (Phase I)
-        self.rna_enc = RNA_Encoder(in_dim=rna_dim, hidden_dim=hidden_dim)
-        self.atac_enc = ATAC_Encoder(in_dim=atac_dim, hidden_dim=hidden_dim)
+        self.rna_enc = RNA_Encoder(in_dim=rna_dim, hidden_dim=hidden_dim, n_heads=rna_heads, dropout=rna_dropout)
+        self.atac_enc = ATAC_Encoder(in_dim=atac_dim, hidden_dim=hidden_dim, dropout=atac_dropout)
         
         # 2. Projections (Phase II)
         self.rna_proj = nn.Linear(hidden_dim, sfib_dim)
@@ -37,9 +43,9 @@ class BioSFINet(nn.Module):
         
         # 5. Contrastive Head (Phase V)
         self.proj_head = nn.Sequential(
-            nn.Linear(sfib_dim, 64),
+            nn.Linear(sfib_dim, proj_hidden),
             nn.ReLU(),
-            nn.Linear(64, 64)
+            nn.Linear(proj_hidden, proj_output)
         )
 
     def forward(self, x_rna, x_atac, edge_index, u_basis):

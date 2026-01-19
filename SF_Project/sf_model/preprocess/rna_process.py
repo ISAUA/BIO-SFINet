@@ -1,6 +1,6 @@
 import scanpy as sc
 
-def process_rna_pipeline(adata, n_top_genes=3000):
+def process_rna_pipeline(adata, n_top_genes=3000, min_cells=3, target_sum=1e4):
     """
     完全复刻 MultiGATE / Seurat V3 的处理逻辑
     修正：移除了导致不对齐的细胞过滤步骤
@@ -13,7 +13,7 @@ def process_rna_pipeline(adata, n_top_genes=3000):
     # sc.pp.filter_cells(adata, min_genes=200)  <-- 必须删掉或注释掉
     
     # 过滤基因是可以的，因为这只改变列数 (Features)，不改变行数 (Cells)
-    sc.pp.filter_genes(adata, min_cells=3)
+    sc.pp.filter_genes(adata, min_cells=min_cells)
     
     # 2. 高变基因筛选 (Seurat V3) - 必须基于 Raw Counts
     print("   [RNA] Selecting highly variable genes (on Raw Counts)...")
@@ -30,7 +30,7 @@ def process_rna_pipeline(adata, n_top_genes=3000):
     
     # 3. 标准化 (Normalize)
     print("   [RNA] Normalizing...")
-    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.normalize_total(adata, target_sum=target_sum)
     
     # 4. 对数化 (Log1p)
     print("   [RNA] Log transforming...")

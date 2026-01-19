@@ -162,7 +162,7 @@ def filter_peaks_by_tss(adata, gtf_path, rna_genes, window=100000):
     
     if len(keep_names_set) == 0:
         print("⚠️ Warning: Physical filter removed ALL peaks. Falling back to retaining TOP variance peaks to prevent crash.")
-        fallback_n = min(30000, adata.shape[1])
+        fallback_n = min(n_final, adata.shape[1])
         return adata[:, :fallback_n].copy(), None
 
     # 按原始顺序保留峰，保证列顺序可追踪
@@ -185,7 +185,7 @@ def filter_peaks_by_tss(adata, gtf_path, rna_genes, window=100000):
 
     return filtered_adata, gene_peak_mask
 
-def custom_tf_idf(adata):
+def custom_tf_idf(adata, eps=1e-6):
     """
     TF-IDF 变换
     """
@@ -195,7 +195,7 @@ def custom_tf_idf(adata):
         return adata
 
     X = adata.X
-    idf = X.shape[0] / (X.sum(axis=0) + 1e-6) # 加个极小值防止除零
+    idf = X.shape[0] / (X.sum(axis=0) + eps) # 加个极小值防止除零
     idf = np.array(idf).flatten()
     
     if sparse.issparse(X):
@@ -210,12 +210,22 @@ def custom_tf_idf(adata):
     adata.X = sparse.csr_matrix(adata.X)
     return adata
 
-def process_atac_pipeline(adata, rna_genes, gtf_path, n_global=50000, n_final=30000, window=100000):
+def process_atac_pipeline(
+    adata,
+    rna_genes,
+    gtf_path,
+    n_global=50000,
+    n_final=30000,
+    window=100000,
+    min_cells=50,
+    target_sum=1e4,
+    tfidf_eps=1e-6
+):
     print("--- Processing ATAC Data ---")
     gene_peak_mask = None
     
     # 1. 基础过滤
-    sc.pp.filter_genes(adata, min_cells=50)
+    sc.pp.filter_genes(adata, min_cells=min_cells)
     
     # 2. 全局变异度筛选 (flavor=seurat)
     print(f"Selecting top {n_global} peaks by variance...")
@@ -241,11 +251,11 @@ def process_atac_pipeline(adata, rna_genes, gtf_path, n_global=50000, n_final=30
                 gene_peak_mask = gene_peak_mask[:, selected_idx]
 
     # 4. TF-IDF
-    adata = custom_tf_idf(adata)
+    adata = custom_tf_idf(adata, eps=tfidf_eps)
     
     # 5. Log1p
     if adata.shape[1] > 0:
-        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.normalize_total(adata, target_sum=target_sum)
         sc.pp.log1p(adata)
     
     print(f"Final ATAC shape: {adata.shape}")

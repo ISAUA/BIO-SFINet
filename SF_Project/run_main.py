@@ -48,7 +48,12 @@ def load_and_preprocess_data(config):
     
     # --- 3. RNA Processing ---
     # 使用你的 rna_process.py
-    adata_rna = process_rna_pipeline(adata_rna, n_top_genes=params['n_top_genes'])
+    adata_rna = process_rna_pipeline(
+        adata_rna,
+        n_top_genes=params['n_top_genes'],
+        min_cells=params.get('rna_min_cells', 3),
+        target_sum=params.get('rna_target_sum', 1e4)
+    )
 
     # --- 4. ATAC Processing ---
     # 使用你的 atac_process.py (包含 TSS 筛选 + TF-IDF)
@@ -62,7 +67,10 @@ def load_and_preprocess_data(config):
         gtf_path=gtf_path,
         n_global=params['n_global_peaks'],
         n_final=params['n_final_peaks'],
-        window=params['tss_window']
+        window=params['tss_window'],
+        min_cells=params.get('atac_min_cells', 50),
+        target_sum=params.get('atac_target_sum', 1e4),
+        tfidf_eps=params.get('tfidf_eps', 1e-6)
     )
 
     # --- 5. Prepare Tensors ---
@@ -100,7 +108,7 @@ def main():
     model = BioSFINet(config, atac_dim=atac_dim)
     
     # 5. Training
-    trainer = SFTrainer(model, config)
+    trainer = SFTrainer(model, config, device=config['train'].get('device', 'cuda'))
     print("\n🟢 STARTING TRAINING...")
     trainer.run(rna_feat, atac_feat, edge_index, u_basis)
 

@@ -18,10 +18,12 @@ class SFTrainer:
             weight_decay=float(config['train']['weight_decay'])
         )
         
-        self.clip_criterion = CLIPLoss(temperature=0.1).to(device)
+        clip_temp = float(config['train'].get('clip_temperature', 0.1))
+        self.clip_criterion = CLIPLoss(temperature=clip_temp).to(device)
         self.save_dir = config['project']['save_dir']
         os.makedirs(self.save_dir, exist_ok=True)
         self.logger = logging.getLogger("SFTrainer")
+        self.save_every = config['train'].get('save_every', 50)
 
     def train_epoch(self, rna_feat, atac_feat, edge_index, u_basis):
         self.model.train()
@@ -49,7 +51,7 @@ class SFTrainer:
         # Total Loss
         lambda_r = self.config['train'].get('lambda_rna', 1.0)
         lambda_a = self.config['train'].get('lambda_atac', 1.0)
-        lambda_c = self.config['train'].get('lambda_clip', 0.1)
+        lambda_c = self.config['train'].get('lambda_clip', self.config['train'].get('lambda_fre', 0.1))
         
         total_loss = lambda_r * loss_rec_rna + lambda_a * loss_rec_atac + lambda_c * loss_clip
         
@@ -74,5 +76,5 @@ class SFTrainer:
             if epoch % self.config['train']['log_interval'] == 0:
                 self.logger.info(f"Ep {epoch}: {metrics}")
                 
-            if epoch % 50 == 0:
+            if epoch % self.save_every == 0:
                 torch.save(self.model.state_dict(), os.path.join(self.save_dir, f"ckpt_{epoch}.pth"))
