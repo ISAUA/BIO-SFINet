@@ -3,7 +3,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 import os
 import logging
-from tqdm import tqdm
 from .utils import CLIPLoss
 
 class SFTrainer:
@@ -24,6 +23,9 @@ class SFTrainer:
         os.makedirs(self.save_dir, exist_ok=True)
         self.logger = logging.getLogger("SFTrainer")
         self.save_every = config['train'].get('save_every', 50)
+        self.log_interval = int(config['train'].get('log_interval', 10))
+        self.best_name = config['train'].get('best_name', 'ckpt_best.pth')
+        self.best_path = os.path.join(self.save_dir, self.best_name)
 
     def train_epoch(self, rna_feat, atac_feat, edge_index, u_basis):
         self.model.train()
@@ -67,14 +69,22 @@ class SFTrainer:
 
     def run(self, rna_data, atac_data, edge_index, u_basis):
         epochs = self.config['train']['epochs']
-        pbar = tqdm(range(1, epochs + 1))
-        
-        for epoch in pbar:
+        best_loss = float('inf')
+
+        for epoch in range(1, epochs + 1):
             metrics = self.train_epoch(rna_data, atac_data, edge_index, u_basis)
-            pbar.set_postfix({"Loss": f"{metrics['total']:.4f}"})
-            
-            if epoch % self.config['train']['log_interval'] == 0:
-                self.logger.info(f"Ep {epoch}: {metrics}")
-                
+
+            if metrics['total'] < best_loss:
+                best_loss = metrics['total']
+                torch.save(self.model.state_dict(), self.best_path)
+
+            if epoch % self.log_interval == 0:
+                best_display = f"{best_loss:.4f}" if best_loss < float('inf') else "N/A"
+                print(
+                    f"Epoch {epoch:03d} | total {metrics['total']:.4f} | "
+                    f"rec_rna {metrics['rec_rna']:.4f} | rec_atac {metrics['rec_atac']:.4f} | "
+                    f"clip {metrics['clip']:.4f} | best {best_display}"
+                )
+
             if epoch % self.save_every == 0:
                 torch.save(self.model.state_dict(), os.path.join(self.save_dir, f"ckpt_{epoch}.pth"))

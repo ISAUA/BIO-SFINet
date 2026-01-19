@@ -1,0 +1,77 @@
+# ==========================================
+# Bio-SFINet (Spatial-Frequency Network) 配置
+# 适用数据: Mouse (原始数据模式)
+# ==========================================
+
+project:
+	name: "SF_Mouse_Analysis"        # 项目名称，用于记录
+	version: "1.0.0"                 # 版本号
+	seed: 42                          # 随机种子
+	save_dir: "./results/mouse/checkpoints/"   # 模型 checkpoint 保存目录
+	eval_dir: "./results/mouse/predictions/"   # 评估输出目录
+
+# ------------------------------------------
+# 1. 数据路径与预处理参数
+# ------------------------------------------
+data:
+	raw_path: "data/raw/mouse"        # 原始数据目录
+	processed_path: "data/processed/mouse"  # 预处理输出目录
+  
+	files:                             # 原始文件名定义
+		rna_mtx: "Mouse.mtx"            # RNA 矩阵文件
+		rna_genes: "genes.tsv"          # RNA 基因名文件
+		rna_barcodes: "gene_barcodes.tsv" # RNA 细胞条形码文件
+    
+		atac_mtx: "Mouse_atac.mtx"      # ATAC 矩阵文件
+		atac_peaks: "peaks.tsv"         # ATAC 峰名文件
+		atac_barcodes: "atac_barcodes.tsv" # ATAC 细胞条形码文件
+    
+		spatial: "position.tsv"         # 空间坐标文件
+		gtf: "gencode.vM25.annotation.gtf.gz" # GTF 注释文件
+
+	parameters:                        # 预处理超参数
+		n_top_genes: 3000                # RNA 高变基因数量
+		rna_min_cells: 3                 # 基因至少出现在多少细胞中
+		rna_target_sum: 1e4              # RNA 归一化目标总和
+		n_global_peaks: 50000            # ATAC 初筛峰数量
+		n_final_peaks: 30000             # ATAC 最终保留峰数量
+		atac_min_cells: 50               # 峰至少出现在多少细胞中
+		atac_target_sum: 1e4             # ATAC 归一化目标总和
+		tfidf_eps: 1e-6                  # TF-IDF 平滑项
+		tss_window: 100000               # TSS 上下游窗口大小 (bp)
+		knn_k: 10                        # 构图的 k 近邻
+
+# ------------------------------------------
+# 2. 模型架构参数
+# ------------------------------------------
+model:
+	name: "SFNet"                     # 模型名称
+	rna_in_dim: 3000                   # RNA 输入维度（高变基因数）
+	hidden_dim: 512                    # 编码器隐藏维度
+	rna_n_heads: 4                     # RNA GAT 头数
+	rna_dropout: 0.1                   # RNA 编码器 dropout
+	atac_dropout: 0.1                  # ATAC 编码器 dropout
+	n_heads: 4                         # 备用头数（保持一致）
+	dropout: 0.1                       # 通用 dropout
+	grid_size: 128                     # 网格大小（如有使用）
+	latent_dim: 50                     # 潜变量维度（如有使用）
+	sfib_dim: 128                      # SFIB 特征维度
+	proj_hidden_dim: 64                # 对比投影头隐藏维度
+	proj_output_dim: 64                # 对比投影头输出维度
+
+# ------------------------------------------
+# 3. 训练策略参数
+# ------------------------------------------
+train:
+	epochs: 200                        # 训练轮数
+	batch_size: 1                      # 批大小（当前实现按全量）
+	learning_rate: 1e-3                # 学习率
+	weight_decay: 1e-4                 # 权重衰减
+	lambda_rna: 1.0                    # RNA 重构损失权重
+	lambda_atac: 1.0                   # ATAC 重构损失权重
+	lambda_clip: 0.1                   # 对比损失权重
+	clip_temperature: 0.1              # 对比损失温度
+	save_every: 50                     # 周期性保存间隔
+	device: "cuda"                    # 设备
+	log_interval: 10                   # 日志打印间隔（轮）
+	best_name: "ckpt_best.pth"        # 最优模型文件名
