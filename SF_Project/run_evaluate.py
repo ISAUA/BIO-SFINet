@@ -16,8 +16,8 @@ def load_config(config_path="configs/config_human.yaml"):
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate Bio-SFINet & Plot UMAP/Spatial")
     parser.add_argument("--config", default="configs/config_human.yaml", help="Path to YAML config file")
-    # 默认使用 best，也可以指定 final
-    parser.add_argument("--checkpoint", default="best", choices=["best", "final"], help="Which checkpoint to use (best/final)")
+    # 可在 CLI 覆盖 checkpoint key；若不提供则采用 config 中的 eval.checkpoint
+    parser.add_argument("--checkpoint", default=None, help="Checkpoint key or filename; defaults to config eval.checkpoint")
     parser.add_argument("--resolution", type=float, default=0.5, help="Leiden clustering resolution")
     return parser.parse_args()
 
@@ -146,7 +146,11 @@ def main():
     model = BioSFINet(config, atac_dim=atac_dim).to(device)
     
     # 4. 加载权重
-    ckpt_name = "ckpt_best.pth" if args.checkpoint == "best" else "model_final.pth"
+    eval_cfg = config.get('eval', {})
+    ckpt_key = args.checkpoint or eval_cfg.get('checkpoint', 'best')
+    ckpt_map = eval_cfg.get('checkpoints', {})
+    # 如果 key 存在映射则取映射，否则允许直接把文件名作为 key 使用
+    ckpt_name = ckpt_map.get(ckpt_key, ckpt_key)
     ckpt_path = os.path.join(save_dir, ckpt_name)
     
     if not os.path.exists(ckpt_path):

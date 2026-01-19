@@ -10,6 +10,12 @@ project:
 	save_dir: "./results/mouse/checkpoints/"   # 模型 checkpoint 保存目录
 	eval_dir: "./results/mouse/predictions/"   # 评估输出目录
 
+eval:                               # 评估相关设置
+	checkpoint: "best"               # 默认使用哪个检查点（key 名，可在 checkpoints 映射中定义）
+	checkpoints:                      # key->文件名映射，可自由扩展
+		best: "ckpt_best.pth"
+		final: "model_final.pth"
+
 # ------------------------------------------
 # 1. 数据路径与预处理参数
 # ------------------------------------------
