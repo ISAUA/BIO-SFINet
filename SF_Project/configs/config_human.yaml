@@ -1,0 +1,65 @@
+# ==========================================
+# Bio-SFINet (Spatial-Frequency Network) 配置
+# 适用数据: Human (原始数据模式)
+# ==========================================
+
+project:
+  name: "SF_Human_Analysis"
+  version: "1.0.0"
+  seed: 42
+  save_dir: "./results/human/checkpoints/"
+  eval_dir: "./results/human/predictions/"
+
+# ------------------------------------------
+# 1. 数据路径与预处理参数
+# ------------------------------------------
+data:
+  # 路径配置 (确保您的原始文件都在 data/raw/human 下)
+  raw_path: "data/raw/human"
+  processed_path: "data/processed/human"
+  
+  # 原始文件名定义
+  files:
+    rna_mtx: "Human.mtx"             # 注意文件名大小写，如果不确定请用 ls data/raw/human 确认
+    rna_genes: "genes.tsv"
+    rna_barcodes: "gene_barcodes.tsv" # 注意：原 sc_bridge 代码中可能是 gene_barcodes.tsv
+    
+    atac_mtx: "Human_atac.mtx"
+    atac_peaks: "peaks.tsv"
+    atac_barcodes: "atac_barcodes.tsv"
+    
+    spatial: "position.tsv"
+    gtf: "gencode.v25.annotation.gtf.gz"
+
+  # 预处理超参数
+  parameters:
+    n_top_genes: 3000
+    n_global_peaks: 50000
+    n_final_peaks: 30000
+    tss_window: 100000
+    knn_k: 10
+
+# ------------------------------------------
+# 2. 模型架构参数
+# ------------------------------------------
+model:
+  name: "SFNet"
+  rna_in_dim: 3000
+  hidden_dim: 512
+  n_heads: 4
+  dropout: 0.1
+  grid_size: 128
+  latent_dim: 50
+
+# ------------------------------------------
+# 3. 训练策略参数
+# ------------------------------------------
+train:
+  epochs: 200
+  batch_size: 1
+  learning_rate: 1e-3
+  weight_decay: 1e-4
+  lambda_rna: 1.0
+  lambda_atac: 1.0
+  lambda_fre: 0.1
+  log_interval: 10

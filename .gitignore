@@ -1,0 +1,5 @@
+*.h5ad
+*.pth
+*.pt
+data/
+__pycache__/
