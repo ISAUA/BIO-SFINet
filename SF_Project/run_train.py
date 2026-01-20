@@ -4,6 +4,7 @@ import torch
 import yaml
 from sf_model.model.bio_sfinet import BioSFINet
 from sf_model.trainer import SFTrainer
+from sf_model.utils import set_seed
 
 def load_config(config_path="configs/config_human.yaml"):
     with open(config_path, "r", encoding="utf-8") as f:
@@ -21,6 +22,7 @@ def main():
 
     # 1. 加载配置
     config = load_config(args.config)
+    set_seed(config['project'].get('seed', 42))
     processed_dir = config['data']['processed_path']
     data_path = os.path.join(processed_dir, "processed_data.pt")
     

@@ -1,3 +1,5 @@
+import os
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -63,6 +65,28 @@ def build_spatial_graph(coords, k=10):
     u_basis = torch.FloatTensor(evecs)
     
     return edge_index, u_basis
+
+
+def set_seed(seed: int = 42, deterministic: bool = True):
+    """全局锁定随机种子，尽可能消除非确定性。"""
+    seed = int(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = deterministic
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except TypeError:
+        torch.use_deterministic_algorithms(True)
+
+    return seed
 
 class CLIPLoss(nn.Module):
     """

@@ -190,11 +190,19 @@ def custom_tf_idf(adata, eps=1e-6):
     TF-IDF 变换
     """
     print("Applying Custom TF-IDF transform...")
+    eps = float(eps)
     if adata.shape[1] == 0:
         print("Error: Input matrix has 0 features (peaks). Skipping TF-IDF.")
         return adata
 
     X = adata.X
+    # 确保数据为 float32
+    if sparse.issparse(X):
+        X = X.tocsr().astype(np.float32)
+    else:
+        X = np.array(X, dtype=np.float32)
+    adata.X = X
+
     idf = X.shape[0] / (X.sum(axis=0) + eps) # 加个极小值防止除零
     idf = np.array(idf).flatten()
     
@@ -207,7 +215,7 @@ def custom_tf_idf(adata, eps=1e-6):
         tf = X / X.sum(axis=1, keepdims=True)
         adata.X = tf * idf
         
-    adata.X = sparse.csr_matrix(adata.X)
+    adata.X = sparse.csr_matrix(adata.X, dtype=np.float32)
     return adata
 
 def process_atac_pipeline(
@@ -253,10 +261,22 @@ def process_atac_pipeline(
     # 4. TF-IDF
     adata = custom_tf_idf(adata, eps=tfidf_eps)
     
-    # 5. Log1p
+    # 5. 手工 Normalize + Log1p，避免 normalize_total dtype 兼容问题
     if adata.shape[1] > 0:
-        sc.pp.normalize_total(adata, target_sum=target_sum)
-        sc.pp.log1p(adata)
+        if sparse.issparse(adata.X):
+            adata.X.data[np.isinf(adata.X.data)] = 0.0
+            adata.X.data[np.isnan(adata.X.data)] = 0.0
+            X = adata.X.toarray().astype(np.float32)
+        else:
+            X = np.array(adata.X, dtype=np.float32)
+            X[np.isinf(X)] = 0.0
+            X[np.isnan(X)] = 0.0
+
+        sums = X.sum(axis=1, keepdims=True)
+        sums[sums == 0] = 1.0
+        X = (X / sums) * float(target_sum)
+        X = np.log1p(X)
+        adata.X = X
     
     print(f"Final ATAC shape: {adata.shape}")
     return adata, gene_peak_mask

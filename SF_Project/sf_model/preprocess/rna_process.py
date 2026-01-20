@@ -1,4 +1,6 @@
 import scanpy as sc
+import numpy as np
+import scipy.sparse as sp
 
 def process_rna_pipeline(adata, n_top_genes=3000, min_cells=3, target_sum=1e4):
     """
@@ -8,6 +10,12 @@ def process_rna_pipeline(adata, n_top_genes=3000, min_cells=3, target_sum=1e4):
     print("   [RNA] Starting preprocessing (Seurat V3 flavor)...")
     print(f"   [RNA] Input shape: {adata.shape}")
     
+    # 确保数值类型为 float，避免 normalize_total 时的 dtype 冲突
+    if sp.issparse(adata.X):
+        adata.X = adata.X.tocsr().astype(np.float32)
+    else:
+        adata.X = np.array(adata.X, dtype=np.float32)
+
     # 1. 基础过滤
     # ⚠️ 警告：绝对不要在这里使用 filter_cells，除非你同时去过滤 ATAC 数据
     # sc.pp.filter_cells(adata, min_genes=200)  <-- 必须删掉或注释掉
@@ -28,9 +36,19 @@ def process_rna_pipeline(adata, n_top_genes=3000, min_cells=3, target_sum=1e4):
         print(f"Error in Seurat V3: {e}")
         raise e
     
-    # 3. 标准化 (Normalize)
+    # HVG 子集化后再确保 X 为 float32 且用 dense，避免后续 normalize_total 的 dtype / 稀疏除法问题
+    if sp.issparse(adata.X):
+        adata.X = adata.X.toarray().astype(np.float32)
+    else:
+        adata.X = np.array(adata.X, dtype=np.float32)
+
+    # 3. 标准化 (Normalize) — 手工实现，避免 normalize_total 的 dtype 兼容问题
     print("   [RNA] Normalizing...")
-    sc.pp.normalize_total(adata, target_sum=target_sum)
+    X = np.asarray(adata.X, dtype=np.float32)
+    counts_per_cell = X.sum(axis=1, keepdims=True)
+    counts_per_cell[counts_per_cell == 0] = 1.0  # 防止除零
+    X = (X / counts_per_cell) * float(target_sum)
+    adata.X = X
     
     # 4. 对数化 (Log1p)
     print("   [RNA] Log transforming...")

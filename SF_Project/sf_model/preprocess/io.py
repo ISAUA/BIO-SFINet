@@ -1,6 +1,7 @@
 import pandas as pd
 import anndata as ad
 from scipy import io, sparse
+import numpy as np
 import os
 
 def read_mtx_to_adata(mtx_path, features_path, barcodes_path, transpose=True):
@@ -16,8 +17,8 @@ def read_mtx_to_adata(mtx_path, features_path, barcodes_path, transpose=True):
     if transpose:
         mat = mat.transpose()
     
-    # 转为 CSR 格式 (Your script: rna_mat = csr_matrix(rna_mat))
-    mat = sparse.csr_matrix(mat)
+    # 转为 CSR，并强制为 float32 以避免后续 normalize_total 的 dtype 错误
+    mat = sparse.csr_matrix(mat, dtype=np.float32)
     
     # 2. 读取元数据
     # header=None 对应您脚本中的 pd.read_csv(..., header=None)

@@ -5,6 +5,7 @@ import yaml
 import numpy as np
 import scanpy as sc
 import matplotlib.pyplot as plt
+from sf_model.utils import set_seed
 
 # 引入模型
 from sf_model.model.bio_sfinet import BioSFINet
@@ -120,6 +121,7 @@ def main():
 
     # 1. 加载配置
     config = load_config(args.config)
+    set_seed(config['project'].get('seed', 42))
     processed_dir = config['data']['processed_path']
     save_dir = config['project']['save_dir']
     

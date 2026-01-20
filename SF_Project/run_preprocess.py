@@ -9,7 +9,7 @@ import scanpy as sc
 from sf_model.preprocess.io import read_mtx_to_adata, add_spatial_info
 from sf_model.preprocess.rna_process import process_rna_pipeline
 from sf_model.preprocess.atac_process import process_atac_pipeline
-from sf_model.utils import build_spatial_graph
+from sf_model.utils import build_spatial_graph, set_seed
 
 def load_config(config_path="configs/config_human.yaml"):
     with open(config_path, "r", encoding="utf-8") as f:
@@ -27,6 +27,7 @@ def main():
 
     # 1. 加载配置
     config = load_config(args.config)
+    set_seed(config['project'].get('seed', 42))
     raw_dir = config['data']['raw_path']
     processed_dir = config['data']['processed_path']
     files = config['data']['files']
@@ -35,7 +36,7 @@ def main():
     rna_target_sum = params.get('rna_target_sum', 1e4)
     atac_min_cells = params.get('atac_min_cells', 50)
     atac_target_sum = params.get('atac_target_sum', 1e4)
-    tfidf_eps = params.get('tfidf_eps', 1e-6)
+    tfidf_eps = float(params.get('tfidf_eps', 1e-6))
     
     os.makedirs(processed_dir, exist_ok=True)
 
