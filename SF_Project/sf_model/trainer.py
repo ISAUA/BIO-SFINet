@@ -10,15 +10,16 @@ class SFTrainer:
         self.model = model.to(device)
         self.config = config
         self.device = device
-        
+
+        clip_temp = float(config['train'].get('clip_temperature', 0.1))
+        self.clip_criterion = CLIPLoss(temperature=clip_temp).to(device)
+        params = list(self.model.parameters()) + list(self.clip_criterion.parameters())
+
         self.optimizer = optim.AdamW(
-            self.model.parameters(),
+            params,
             lr=float(config['train']['learning_rate']),
             weight_decay=float(config['train']['weight_decay'])
         )
-        
-        clip_temp = float(config['train'].get('clip_temperature', 0.1))
-        self.clip_criterion = CLIPLoss(temperature=clip_temp).to(device)
         self.save_dir = config['project']['save_dir']
         os.makedirs(self.save_dir, exist_ok=True)
         self.logger = logging.getLogger("SFTrainer")

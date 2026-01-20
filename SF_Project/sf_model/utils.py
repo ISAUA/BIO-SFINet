@@ -70,7 +70,8 @@ class CLIPLoss(nn.Module):
     """
     def __init__(self, temperature=0.1):
         super().__init__()
-        self.temperature = temperature
+        init = torch.log(torch.tensor(float(temperature)))
+        self.log_temperature = nn.Parameter(init)
 
     def forward(self, z_rna, z_atac):
         # L2 Normalize
@@ -78,7 +79,8 @@ class CLIPLoss(nn.Module):
         z_atac = F.normalize(z_atac, dim=1)
         
         # Similarity Matrix
-        logits = torch.matmul(z_rna, z_atac.T) / self.temperature
+        temperature = self.log_temperature.exp().clamp(min=1e-3, max=10.0)
+        logits = torch.matmul(z_rna, z_atac.T) / temperature
         
         # Labels: Diagonal is positive pair
         batch_size = z_rna.shape[0]
