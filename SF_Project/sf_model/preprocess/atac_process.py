@@ -94,7 +94,7 @@ def parse_peak_coords(peak_names):
                 
     return parsed
 
-def filter_peaks_by_tss(adata, gtf_path, rna_genes, window=100000):
+def filter_peaks_by_tss(adata, gtf_path, rna_genes, window=100000, n_final=30000):
     """
     根据 RNA 基因的 TSS 筛选物理相关的 Peaks，同时构建 Gene-Peak 掩码矩阵。
 
@@ -245,7 +245,7 @@ def process_atac_pipeline(
 
     # 3. TSS 物理筛选
     if gtf_path and rna_genes is not None:
-        adata, gene_peak_mask = filter_peaks_by_tss(adata, gtf_path, rna_genes, window=window)
+        adata, gene_peak_mask = filter_peaks_by_tss(adata, gtf_path, rna_genes, window=window, n_final=n_final)
         
         # 二次筛选
         if adata.shape[1] > n_final:
@@ -256,7 +256,7 @@ def process_atac_pipeline(
             if gene_peak_mask is not None:
                 # 同步裁剪掩码的列
                 selected_idx = np.nonzero(hvg_mask)[0]
-                gene_peak_mask = gene_peak_mask[:, selected_idx]
+                gene_peak_mask = gene_peak_mask.tocsr()[:, selected_idx]
 
     # 4. TF-IDF
     adata = custom_tf_idf(adata, eps=tfidf_eps)
