@@ -4,80 +4,80 @@
 # ==========================================
 
 project:
-  name: "SF_Mouse_Analysis"
-  version: "1.0.0"
-  seed: 42
-  save_dir: "./results/mouse/checkpoints/"
-  eval_dir: "./results/mouse/predictions/"
+  name: "SF_Mouse_Analysis"        # 项目名称标签
+  version: "1.0.0"                 # 配置版本号
+  seed: 42                          # 随机种子
+  save_dir: "./results/mouse/checkpoints/"   # 训练权重保存目录
+  eval_dir: "./results/mouse/predictions/"   # 评估输出目录（h5ad 等）
 
 eval:
-  checkpoint: "best"
+  checkpoint: "best"               # 默认评估使用的 key
   checkpoints:
-    best: "ckpt_best.pth"
-    final: "ckpt_200.pth"
+    best: "ckpt_best.pth"          # 最优权重文件名
+    final: "ckpt_200.pth"          # 指定轮次权重文件名示例
 
 # ------------------------------------------
 # 1. 数据路径与预处理参数（超参与 human 对齐）
 # ------------------------------------------
 data:
-  raw_path: "data/raw/mouse"
-  processed_path: "data/processed/mouse"
+  raw_path: "data/raw/mouse"        # 原始数据目录
+  processed_path: "data/processed/mouse"  # 预处理输出目录
 
   files:
-    rna_mtx: "P22.mtx"
-    rna_genes: "genes.tsv"
-    rna_barcodes: "gene_barcodes.tsv"
+    rna_mtx: "P22.mtx"              # RNA 表达矩阵
+    rna_genes: "genes.tsv"          # RNA 基因名
+    rna_barcodes: "gene_barcodes.tsv" # RNA 条形码
 
-    atac_mtx: "P22_atac.mtx"
-    atac_peaks: "peaks.tsv"
-    atac_barcodes: "atac_barcodes.tsv"
+    atac_mtx: "P22_atac.mtx"        # ATAC 计数矩阵
+    atac_peaks: "peaks.tsv"         # ATAC 峰注释
+    atac_barcodes: "atac_barcodes.tsv" # ATAC 条形码
 
-    spatial: "position.tsv"
-    gtf: "gencode.vM25.annotation.gtf.gz"
+    spatial: "position.tsv"         # 空间坐标文件
+    gtf: "gencode.vM23.annotation.gtf.gz" # 基因注释 GTF
 
   parameters:
-    n_top_genes: 3000
-    rna_min_cells: 3
-    rna_target_sum: 1e4
-    n_global_peaks: 50000
-    n_final_peaks: 30000
-    atac_min_cells: 50
-    atac_target_sum: 1e4
-    tfidf_eps: 1e-6
-    tss_window: 150000
-    knn_k: 10
+    n_top_genes: 3000                # 选取的高变基因数
+    rna_min_cells: 3                 # 基因出现的最少细胞数过滤
+    rna_target_sum: 1e4              # RNA 归一化目标总和
+    n_global_peaks: 50000            # ATAC 初筛峰数
+    n_final_peaks: 30000             # ATAC 最终保留峰数
+    atac_min_cells: 50               # 峰出现的最少细胞数过滤
+    atac_target_sum: 1e4             # ATAC 归一化目标总和
+    tfidf_eps: 1e-6                  # TF-IDF 平滑项
+    tss_window: 150000               # TSS 上下游窗口(bp)
+    knn_k: 10                        # 空间图 k 近邻
 
 # ------------------------------------------
 # 2. 模型架构参数
 # ------------------------------------------
 model:
-  name: "SFNet"
-  rna_in_dim: 3000
-  hidden_dim: 512
-  rna_n_heads: 4
-  rna_dropout: 0.1
-  atac_dropout: 0.1
-  n_heads: 4
-  dropout: 0.1
-  grid_size: 128
-  latent_dim: 50
-  sfib_dim: 128
-  proj_hidden_dim: 64
-  proj_output_dim: 64
+  name: "SFNet"                     # 模型名称占位
+  rna_in_dim: 3000                   # RNA 输入维度（高变基因数）
+  hidden_dim: 512                    # 主干隐藏维度
+  rna_n_heads: 4                     # RNA GAT 头数
+  rna_dropout: 0.1                   # RNA 分支 dropout
+  atac_dropout: 0.1                  # ATAC 分支 dropout
+  n_heads: 4                         # 通用头数占位
+  dropout: 0.1                       # 通用 dropout
+  grid_size: 128                     # 若用网格特征时的尺寸
+  latent_dim: 50                     # 潜变量维度
+  sfib_dim: 128                      # SFIB 特征维度
+  proj_hidden_dim: 64                # 对比投影头隐藏维度
+  proj_output_dim: 64                # 对比投影头输出维度
 
 # ------------------------------------------
 # 3. 训练策略参数（与 human 对齐）
 # ------------------------------------------
 train:
-  epochs: 300
-  batch_size: 1
-  learning_rate: 1e-3
-  weight_decay: 1e-4
-  lambda_rna: 1.0
-  lambda_atac: 1.0
-  lambda_clip: 0.1
-  clip_temperature: 0.1
-  save_every: 50
-  device: "cuda"
-  log_interval: 10
-  best_name: "ckpt_best.pth"
+  epochs: 300                       # 训练总轮数
+  batch_size: 1                     # 全量训练，保持1
+  learning_rate: 1e-3               # 学习率
+  weight_decay: 1e-4                # 权重衰减
+  lambda_rna: 1.0                   # RNA 重构损失权重
+  lambda_atac: 1.0                  # ATAC 重构损失权重
+  lambda_clip: 0.1                  # 对比损失权重
+  clip_temperature: 0.1             # 对比温度
+  save_every: 50                    # 权重保存间隔
+  device: "cuda"                   # 训练设备
+  log_interval: 10                  # 日志打印间隔
+  best_name: "ckpt_best.pth"       # 最优模型文件名
