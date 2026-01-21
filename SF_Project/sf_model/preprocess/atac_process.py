@@ -252,6 +252,13 @@ def process_atac_pipeline(
             print(f"Downsampling to {n_final} peaks...")
             sc.pp.highly_variable_genes(adata, flavor="seurat", n_top_genes=n_final)
             hvg_mask = adata.var['highly_variable'].values
+            # 处理 ties 或浮动导致的 > n_final 的情况，强制截断到 n_final
+            if hvg_mask.sum() > n_final:
+                keep_idx = np.flatnonzero(hvg_mask)[:n_final]
+                mask_trim = np.zeros_like(hvg_mask, dtype=bool)
+                mask_trim[keep_idx] = True
+                hvg_mask = mask_trim
+
             adata = adata[:, hvg_mask].copy()
             if gene_peak_mask is not None:
                 # 同步裁剪掩码的列
