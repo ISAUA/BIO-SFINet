@@ -1,5 +1,6 @@
 import os
 import argparse
+import re
 import torch
 import yaml
 import numpy as np
@@ -22,7 +23,20 @@ def parse_args():
     parser.add_argument("--resolution", type=float, default=0.5, help="Leiden clustering resolution")
     return parser.parse_args()
 
-def visualize_and_save(z_final, coords, save_dir, resolution=0.5):
+def infer_epoch_label(ckpt_name):
+    """
+    从 checkpoint 文件名中推断 epoch 标签，便于图上标注。
+    例如 ckpt_150.pth -> "第 150 个 epoch"；ckpt_best.pth -> "最佳 (best)"。
+    """
+    base = os.path.splitext(os.path.basename(ckpt_name))[0]
+    match = re.search(r"ckpt[_-]?(\d+)", base)
+    if match:
+        return f"第 {match.group(1)} 个 epoch"
+    if "best" in base.lower():
+        return "最佳 (best)"
+    return base
+
+def visualize_and_save(z_final, coords, save_dir, resolution=0.5, epoch_label=None):
     """
     使用 Scanpy 进行降维、聚类和绘图
     z_final: [N, C] 最终的融合特征 (Tensor or Numpy)
@@ -87,6 +101,17 @@ def visualize_and_save(z_final, coords, save_dir, resolution=0.5):
     # 翻转 Y 轴以匹配常见的显微镜视角 (可选)
     # axs[1].invert_yaxis() 
     
+    # 在图外标注使用的 epoch 信息
+    if epoch_label:
+        fig.text(
+            0.5,
+            0.99,
+            f"使用 {epoch_label} 的权重进行绘图",
+            ha="center",
+            va="top",
+            fontsize=12
+        )
+    
     # 4. 保存图片
     # 如果 save_dir 是 checkpoints 目录，我们把图存到上级的 figures 目录
     if save_dir.rstrip('/').endswith('checkpoints'):
@@ -98,7 +123,11 @@ def visualize_and_save(z_final, coords, save_dir, resolution=0.5):
     os.makedirs(fig_dir, exist_ok=True)
     plot_path = os.path.join(fig_dir, "spatial_analysis.pdf")
     
-    plt.tight_layout()
+    # 为顶部文字预留空间
+    if epoch_label:
+        plt.tight_layout(rect=(0, 0, 1, 0.94))
+    else:
+        plt.tight_layout()
     plt.savefig(plot_path, dpi=300)
     plt.close()
     
@@ -165,6 +194,7 @@ def main():
     state_dict = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(state_dict, strict=False)
     model.eval()
+    epoch_label = infer_epoch_label(ckpt_name)
     
     # 5. 推理 (Inference)
     print("\n🔮 Running Inference...")
@@ -186,7 +216,8 @@ def main():
         z_final, 
         coords, 
         save_dir, 
-        resolution=args.resolution
+        resolution=args.resolution,
+        epoch_label=epoch_label
     )
     
     print("\n🎉 Evaluation Complete!")

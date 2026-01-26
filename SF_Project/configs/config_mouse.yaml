@@ -41,11 +41,11 @@ data:
     rna_target_sum: 1e4              # RNA 归一化目标总和
     n_global_peaks: 50000            # ATAC 初筛峰数
     n_final_peaks: 30000             # ATAC 最终保留峰数
-    atac_min_cells: 50               # 峰出现的最少细胞数过滤
+    atac_min_cells: 100               # 峰出现的最少细胞数过滤
     atac_target_sum: 1e4             # ATAC 归一化目标总和
     tfidf_eps: 1e-6                  # TF-IDF 平滑项
     tss_window: 150000               # TSS 上下游窗口(bp)
-    knn_k: 10                        # 空间图 k 近邻
+    knn_k: 50                        # 空间图 k 近邻
 
 # ------------------------------------------
 # 2. 模型架构参数
@@ -69,7 +69,7 @@ model:
 # 3. 训练策略参数（与 human 对齐）
 # ------------------------------------------
 train:
-  epochs: 300                       # 训练总轮数
+  epochs: 1000                       # 训练总轮数
   batch_size: 1                     # 全量训练，保持1
   learning_rate: 1e-3               # 学习率
   weight_decay: 1e-4                # 权重衰减

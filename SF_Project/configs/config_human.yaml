@@ -14,7 +14,7 @@ eval:                               # 评估相关设置
   checkpoint: "final"               # 默认使用哪个检查点（key 名，可在 checkpoints 映射中定义）
   checkpoints:                      # key->文件名映射，可自由扩展
     best: "ckpt_best.pth"
-    final: "ckpt_200.pth"
+    final: "ckpt_300.pth"
 
 # ------------------------------------------
 # 1. 数据路径与预处理参数
@@ -69,7 +69,7 @@ model:
 # 3. 训练策略参数
 # ------------------------------------------
 train:
-  epochs: 300                        # 训练轮数
+  epochs: 1000                        # 训练轮数
   batch_size: 1                      # 批大小（当前实现按全量）
   learning_rate: 1e-3                # 学习率
   weight_decay: 1e-4                 # 权重衰减
