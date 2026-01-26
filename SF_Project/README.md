@@ -63,3 +63,4 @@ python run_pipeline.py --dataset mouse --steps evaluate --checkpoint ckpt_best.p
 - 仅预处理：`python run_pipeline.py --dataset human --steps preprocess`
 - 仅训练：`python run_pipeline.py --dataset human --steps train`
 - 仅评估：`python run_pipeline.py --dataset human --steps evaluate --checkpoint ckpt_best.pth`
+- 评估和绘图参数：`python run_pipeline.py --dataset human --steps evaluate --checkpoint ckpt_best.pth --resolution 0.9`

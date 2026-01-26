@@ -45,7 +45,7 @@ data:
     atac_target_sum: 1e4             # ATAC 归一化目标总和
     tfidf_eps: 1e-6                  # TF-IDF 平滑项
     tss_window: 150000               # TSS 上下游窗口大小 (bp)
-    knn_k: 15                        # 构图的 k 近邻
+    knn_k: 50                        # 构图的 k 近邻
 
 # ------------------------------------------
 # 2. 模型架构参数

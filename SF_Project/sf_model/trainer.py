@@ -6,9 +6,9 @@ import os
 import logging
 from .utils import CLIPLoss
 
-# 1. 新增: 加权 MSE Loss 类
+# 1. 加权 MSE Loss 类 (保持不变)
 class WeightedMSELoss(nn.Module):
-    def __init__(self, pos_weight=10.0): # 推荐权重 10-20
+    def __init__(self, pos_weight=10.0): 
         super().__init__()
         self.pos_weight = pos_weight
 
@@ -28,8 +28,7 @@ class SFTrainer:
         clip_temp = float(config['train'].get('clip_temperature', 0.1))
         self.clip_criterion = CLIPLoss(temperature=clip_temp).to(device)
         
-        # 2. 修改: 初始化 WeightedMSELoss
-        # 推荐: RNA 权重 5-10, ATAC 权重 10-20 (因为 ATAC 更稀疏)
+        # 初始化 Loss (保持不变，WeightedMSE 对于深层网络至关重要)
         self.criterion_rna = WeightedMSELoss(pos_weight=10.0).to(device)
         self.criterion_atac = WeightedMSELoss(pos_weight=20.0).to(device)
 
@@ -57,19 +56,24 @@ class SFTrainer:
         edge_index = edge_index.to(self.device)
         u_basis = u_basis.to(self.device)
         
+        # Forward pass
         z_rna, z_atac, p_rna, p_atac, rec_rna, rec_atac = self.model(
             rna_feat, atac_feat, edge_index, u_basis
         )
         
-        # 3. 修改: 使用 Weighted Loss 计算
+        # 1. 重构损失
         loss_rec_rna = self.criterion_rna(rec_rna, rna_feat)
         loss_rec_atac = self.criterion_atac(rec_atac, atac_feat)
         
+        # 2. 对齐损失
         loss_clip = self.clip_criterion(p_rna, p_atac)
         
-        lambda_r = self.config['train'].get('lambda_rna', 1.0)
-        lambda_a = self.config['train'].get('lambda_atac', 1.0)
-        lambda_c = self.config['train'].get('lambda_clip', 0.1)
+        # 3. [策略调整] 回归 RNA 主导，移除空间平滑
+        # 既然 KNN 已经降到了 15，就不再需要强制平滑来模糊边界了
+        # 我们大幅提高 RNA 权重，强迫模型去拟合海马体清晰的基因表达结构
+        lambda_r = 5.0   # [大幅提高] RNA 是结构之源
+        lambda_a = 1.0   # [降低] ATAC 辅助即可，避免噪声干扰
+        lambda_c = 0.5   # [保持] 维持模态对齐
         
         total_loss = lambda_r * loss_rec_rna + lambda_a * loss_rec_atac + lambda_c * loss_clip
         
@@ -82,10 +86,8 @@ class SFTrainer:
             "rec_atac": loss_rec_atac.item(),
             "clip": loss_clip.item()
         }
-    
-    # run 函数保持不变...
+
     def run(self, rna_data, atac_data, edge_index, u_basis):
-        # ... (保持原样)
         epochs = self.config['train']['epochs']
         best_loss = float('inf')
 
