@@ -115,8 +115,8 @@ class BioSFINet(nn.Module):
         self.rna_dec = DeepDecoder(
             in_dim=sfib_dim,
             out_dim=rna_dim,
-            hidden_dim=1024,
-            n_blocks=3,
+            hidden_dim=512,
+            n_blocks=1,
             dropout=rna_dropout
         )
         
@@ -124,8 +124,8 @@ class BioSFINet(nn.Module):
         self.atac_dec = DeepDecoder(
             in_dim=sfib_dim,
             out_dim=atac_dim,
-            hidden_dim=2048,
-            n_blocks=3,
+            hidden_dim=512,
+            n_blocks=1,
             dropout=atac_dropout
         )
         
