@@ -25,26 +25,42 @@ class SFTrainer:
         self.config = config
         self.device = device
 
-        clip_temp = float(config['train'].get('clip_temperature', 0.1))
+        self.train_cfg = config['train']
+        clip_temp = float(self.train_cfg.get('clip_temperature', 0.1))
         self.clip_criterion = CLIPLoss(temperature=clip_temp).to(device)
         
         # 初始化 Loss (保持不变，WeightedMSE 对于深层网络至关重要)
-        self.criterion_rna = WeightedMSELoss(pos_weight=10.0).to(device)
-        self.criterion_atac = WeightedMSELoss(pos_weight=20.0).to(device)
+        pos_weight_rna = float(self.train_cfg.get('pos_weight_rna', 10.0))
+        pos_weight_atac = float(self.train_cfg.get('pos_weight_atac', 20.0))
+        self.criterion_rna = WeightedMSELoss(pos_weight=pos_weight_rna).to(device)
+        self.criterion_atac = WeightedMSELoss(pos_weight=pos_weight_atac).to(device)
 
         params = list(self.model.parameters()) + list(self.clip_criterion.parameters())
 
+        lr_high = float(self.train_cfg['learning_rate'])
+        lr_low = float(self.train_cfg.get('learning_rate_low', lr_high * 0.1))
+        lr_switch = int(self.train_cfg.get('lr_switch_epoch', 500))
+
         self.optimizer = optim.AdamW(
             params,
-            lr=float(config['train']['learning_rate']),
+            lr=lr_high,
             weight_decay=float(config['train']['weight_decay'])
         )
+
+        # 两段式学习率：前 lr_switch 轮用 lr_high，之后降到 lr_low
+        def lr_lambda(epoch_idx: int):
+            return 1.0 if epoch_idx < lr_switch else lr_low / lr_high
+
+        self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lr_lambda)
+        self.lr_switch = lr_switch
+        self.lr_high = lr_high
+        self.lr_low = lr_low
         self.save_dir = config['project']['save_dir']
         os.makedirs(self.save_dir, exist_ok=True)
         self.logger = logging.getLogger("SFTrainer")
-        self.save_every = config['train'].get('save_every', 50)
-        self.log_interval = int(config['train'].get('log_interval', 10))
-        self.best_name = config['train'].get('best_name', 'ckpt_best.pth')
+        self.save_every = self.train_cfg.get('save_every', 50)
+        self.log_interval = int(self.train_cfg.get('log_interval', 10))
+        self.best_name = self.train_cfg.get('best_name', 'ckpt_best.pth')
         self.best_path = os.path.join(self.save_dir, self.best_name)
 
     def train_epoch(self, rna_feat, atac_feat, edge_index, u_basis):
@@ -68,12 +84,9 @@ class SFTrainer:
         # 2. 对齐损失
         loss_clip = self.clip_criterion(p_rna, p_atac)
         
-        # 3. [策略调整] 回归 RNA 主导，移除空间平滑
-        # 既然 KNN 已经降到了 15，就不再需要强制平滑来模糊边界了
-        # 我们大幅提高 RNA 权重，强迫模型去拟合海马体清晰的基因表达结构
-        lambda_r = 5.0   # [大幅提高] RNA 是结构之源
-        lambda_a = 1.0   # [降低] ATAC 辅助即可，避免噪声干扰
-        lambda_c = 0.5   # [保持] 维持模态对齐
+        lambda_r = float(self.train_cfg.get('lambda_rna', 1.0))
+        lambda_a = float(self.train_cfg.get('lambda_atac', 1.0))
+        lambda_c = float(self.train_cfg.get('lambda_clip', 0.1))
         
         total_loss = lambda_r * loss_rec_rna + lambda_a * loss_rec_atac + lambda_c * loss_clip
         
@@ -94,6 +107,10 @@ class SFTrainer:
         for epoch in range(1, epochs + 1):
             metrics = self.train_epoch(rna_data, atac_data, edge_index, u_basis)
 
+            # 更新学习率调度
+            self.lr_scheduler.step()
+            current_lr = self.optimizer.param_groups[0]['lr']
+
             if metrics['total'] < best_loss:
                 best_loss = metrics['total']
                 torch.save(self.model.state_dict(), self.best_path)
@@ -103,7 +120,7 @@ class SFTrainer:
                 print(
                     f"Epoch {epoch:03d} | total {metrics['total']:.4f} | "
                     f"rec_rna {metrics['rec_rna']:.4f} | rec_atac {metrics['rec_atac']:.4f} | "
-                    f"clip {metrics['clip']:.4f} | best {best_display}"
+                    f"clip {metrics['clip']:.4f} | lr {current_lr:.2e} | best {best_display}"
                 )
 
             if epoch % self.save_every == 0:

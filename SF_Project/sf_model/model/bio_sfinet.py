@@ -86,6 +86,7 @@ class BioSFINet(nn.Module):
         rna_dim = model_cfg['rna_in_dim']
         hidden_dim = model_cfg['hidden_dim']
         sfib_dim = model_cfg.get('sfib_dim', 128)
+        sfib_ino_layers = model_cfg.get('sfib_ino_layers', 3)
         rna_heads = model_cfg.get('rna_n_heads', model_cfg.get('n_heads', 4))
         rna_dropout = model_cfg.get('rna_dropout', model_cfg.get('dropout', 0.1))
         atac_dropout = model_cfg.get('atac_dropout', model_cfg.get('dropout', 0.1))
@@ -104,28 +105,32 @@ class BioSFINet(nn.Module):
         
         # 3. Dual Towers (Phase III) - 保持不变
         # Left Tower: ATAC Main
-        self.sfib_atac = SFIB(dim=sfib_dim)
+        self.sfib_atac = SFIB(dim=sfib_dim, num_ino_layers=sfib_ino_layers)
         # Right Tower: RNA Main
-        self.sfib_rna = SFIB(dim=sfib_dim)
+        self.sfib_rna = SFIB(dim=sfib_dim, num_ino_layers=sfib_ino_layers)
         
         # 4. Decoders (Phase IV) - [核心修改]
         # 使用 DeepDecoder 替换简单的 Linear
         
         # RNA Decoder: 1024 hidden dim, 3 layers
+        rna_dec_hidden = model_cfg.get('rna_dec_hidden', 512)
+        rna_dec_blocks = model_cfg.get('rna_dec_blocks', 1)
         self.rna_dec = DeepDecoder(
             in_dim=sfib_dim,
             out_dim=rna_dim,
-            hidden_dim=512,
-            n_blocks=1,
+            hidden_dim=rna_dec_hidden,
+            n_blocks=rna_dec_blocks,
             dropout=rna_dropout
         )
         
         # ATAC Decoder: 2048 hidden dim, 3 layers (ATAC 更稀疏需要更大容量)
+        atac_dec_hidden = model_cfg.get('atac_dec_hidden', 512)
+        atac_dec_blocks = model_cfg.get('atac_dec_blocks', 1)
         self.atac_dec = DeepDecoder(
             in_dim=sfib_dim,
             out_dim=atac_dim,
-            hidden_dim=512,
-            n_blocks=1,
+            hidden_dim=atac_dec_hidden,
+            n_blocks=atac_dec_blocks,
             dropout=atac_dropout
         )
         

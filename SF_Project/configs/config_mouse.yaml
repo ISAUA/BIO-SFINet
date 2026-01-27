@@ -62,8 +62,13 @@ model:
   grid_size: 128                     # 若用网格特征时的尺寸
   latent_dim: 50                     # 潜变量维度
   sfib_dim: 128                      # SFIB 特征维度
+  sfib_ino_layers: 3                 # SFIB INO 单元层数
   proj_hidden_dim: 64                # 对比投影头隐藏维度
   proj_output_dim: 64                # 对比投影头输出维度
+  rna_dec_hidden: 512                # RNA 解码器隐藏维度
+  rna_dec_blocks: 1                  # RNA 解码器残差块数
+  atac_dec_hidden: 512               # ATAC 解码器隐藏维度
+  atac_dec_blocks: 1                 # ATAC 解码器残差块数
 
 # ------------------------------------------
 # 3. 训练策略参数（与 human 对齐）
@@ -71,11 +76,15 @@ model:
 train:
   epochs: 1000                       # 训练总轮数
   batch_size: 1                     # 全量训练，保持1
-  learning_rate: 1e-3               # 学习率
+  learning_rate: 1e-3               # 学习率（前 500 轮）
+  learning_rate_low: 1e-4           # 学习率（后 500 轮）
+  lr_switch_epoch: 800              # 学习率切换轮次
   weight_decay: 1e-4                # 权重衰减
-  lambda_rna: 1.0                   # RNA 重构损失权重
+  lambda_rna: 5.0                   # RNA 重构损失权重
   lambda_atac: 1.0                  # ATAC 重构损失权重
-  lambda_clip: 0.1                  # 对比损失权重
+  lambda_clip: 0.5                  # 对比损失权重
+  pos_weight_rna: 10.0              # RNA 重构正样本权重
+  pos_weight_atac: 20.0             # ATAC 重构正样本权重
   clip_temperature: 0.1             # 对比温度
   save_every: 50                    # 权重保存间隔
   device: "cuda"                   # 训练设备

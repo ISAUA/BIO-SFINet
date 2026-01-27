@@ -3,14 +3,40 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
+
+class INOUnit(nn.Module):
+    """双向仿射耦合的 INO 单元，Guide⇄Main 互修。"""
+    def __init__(self, dim: int):
+        super().__init__()
+        # Guide 修 Main
+        self.gcn_s1 = GCNConv(dim, dim)
+        self.gcn_t1 = GCNConv(dim, dim)
+        # Main* 反向修 Guide
+        self.gcn_s2 = GCNConv(dim, dim)
+        self.gcn_t2 = GCNConv(dim, dim)
+
+    def forward(self, x_main, x_guide, edge_index):
+        # Step1: Guide -> Main
+        s1 = torch.tanh(self.gcn_s1(x_guide, edge_index))
+        t1 = self.gcn_t1(x_guide, edge_index)
+        x_main_star = x_main * torch.exp(s1) + t1
+
+        # Step2: Main* -> Guide
+        s2 = torch.tanh(self.gcn_s2(x_main_star, edge_index))
+        t2 = self.gcn_t2(x_main_star, edge_index)
+        x_guide_star = x_guide * torch.exp(s2) + t2
+
+        return x_main_star, x_guide_star
+
 class SFIB(nn.Module):
     """
     Spatial-Frequency Integration Block (Graph-Spectral Version)
     严格遵循最终框架设计: Phase III
     """
-    def __init__(self, dim=128):
+    def __init__(self, dim=128, num_ino_layers: int = 3):
         super().__init__()
         self.dim = dim
+        self.num_ino_layers = int(num_ino_layers)
         
         # ==========================
         # 1. 频率域分支 (Frequency Branch - GFT)
@@ -27,10 +53,10 @@ class SFIB(nn.Module):
         # ==========================
         # 2. 空间域分支 (Spatial Branch - Graph INO)
         # ==========================
-        # 使用 GCNConv 作为 GNN_Aggregator 提取局部微环境 (S, T)
-        # Guide -> Main
-        self.gcn_s = GCNConv(dim, dim)
-        self.gcn_t = GCNConv(dim, dim)
+        # 堆叠可配置数量的双向 INO 单元
+        self.ino_layers = nn.ModuleList([INOUnit(dim) for _ in range(self.num_ino_layers)])
+        # 拼接 Main/Guide 后用 1x1 线性压回 dim 维
+        self.spa_proj = nn.Linear(dim * 2, dim)
         
         # ==========================
         # 3. 双域融合 (Dual Fusion)
@@ -82,19 +108,12 @@ class SFIB(nn.Module):
 
     def forward_spatial(self, x_main, x_guide, edge_index):
         """
-        空域处理: GNN Agg -> INN Coupling
+        空域处理: 3 层 INO 级联双向互修 + 拼接压缩
         """
-        # 1. Guide -> Main
-        # 获取 Guide 的局部环境特征 (S, T)
-        s = self.gcn_s(x_guide, edge_index)
-        t = self.gcn_t(x_guide, edge_index)
-        
-        # 2. Affine Coupling
-        # H_main' = H_main * exp(S) + T
-        # 限制 S 的范围以防数值不稳定
-        s = torch.tanh(s)
-        h_spatial = x_main * torch.exp(s) + t
-        
+        main, guide = x_main, x_guide
+        for ino in self.ino_layers:
+            main, guide = ino(main, guide, edge_index)
+        h_spatial = self.spa_proj(torch.cat([main, guide], dim=1))
         return h_spatial
 
     def forward(self, x_main, x_guide, edge_index, u_basis):
