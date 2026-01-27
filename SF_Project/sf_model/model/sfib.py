@@ -76,6 +76,8 @@ class SFIB(nn.Module):
         )
         
         self.out_proj = nn.Linear(dim * 2, dim)
+        # 细节注入强度参数 gamma
+        self.gamma = nn.Parameter(torch.tensor(1.0))
 
     def forward_freq(self, x_main, x_guide, u_basis):
         """
@@ -128,15 +130,18 @@ class SFIB(nn.Module):
         h_spatial = self.forward_spatial(x_main, x_guide, edge_index)
         
         # --- Branch 3: Dual Interaction ---
-        # 1. Node Attn (找茬)
-        diff = h_spatial - h_freq
-        w_node = self.node_attn(diff)
-        
-        # 2. 补全
-        h_enhanced = h_spatial + h_freq * w_node
-        
-        # 3. Concat & Channel Selection
-        h_cat = torch.cat([h_enhanced, h_freq], dim=1) # [N, 2C]
+        # A. 提取高频残差 (反锐化掩模)
+        f_detail = h_spatial - h_freq
+
+        # B. 自适应细节注入权重
+        w_inject = self.node_attn(f_detail)  # 使用已有 MLP+Sigmoid
+        f_sharp = w_inject * f_detail
+
+        # C. 频域为基底，加权细节叠加
+        h_enhanced = h_freq + self.gamma * f_sharp
+
+        # 拼接：保持与增强后的基底对应
+        h_cat = torch.cat([h_enhanced, h_spatial], dim=1) # [N, 2C]
         
         # Global Avg/Std for Channel Attn (简化版)
         # w_channel = self.channel_fc(h_cat.mean(0, keepdim=True)) ... 省略复杂实现
