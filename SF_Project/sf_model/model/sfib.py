@@ -4,6 +4,32 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
 
+class AdaptiveGatedFusion(nn.Module):
+    """通道级自适应门控融合，平等融合频域与空间域。"""
+    def __init__(self, dim: int):
+        super().__init__()
+        self.dim = dim
+        self.gate_net = nn.Sequential(
+            nn.Linear(dim * 2, dim // 2),
+            nn.LayerNorm(dim // 2),
+            nn.ReLU(),
+            nn.Linear(dim // 2, dim * 2),
+            nn.Sigmoid()
+        )
+        self.out_proj = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim)
+        )
+
+    def forward(self, h_freq, h_spatial):
+        cat_feat = torch.cat([h_freq, h_spatial], dim=1)  # [N, 2C]
+        weights = self.gate_net(cat_feat)                 # [N, 2C]
+        w_freq = weights[:, :self.dim]
+        w_spatial = weights[:, self.dim:]
+        h_fused = (h_freq * w_freq) + (h_spatial * w_spatial)
+        return self.out_proj(h_fused)
+
+
 class INOUnit(nn.Module):
     """双向仿射耦合的 INO 单元，Guide⇄Main 互修。"""
     def __init__(self, dim: int):
@@ -61,21 +87,7 @@ class SFIB(nn.Module):
         # ==========================
         # 3. 双域融合 (Dual Fusion)
         # ==========================
-        # Node Attention: 根据 diff 决定权重
-        self.node_attn = nn.Sequential(
-            nn.Linear(dim, 1),
-            nn.Sigmoid()
-        )
-        
-        # Channel Attention: 简单实现
-        self.channel_fc = nn.Sequential(
-            nn.Linear(dim * 2, dim // 2),
-            nn.ReLU(),
-            nn.Linear(dim // 2, dim * 2),
-            nn.Sigmoid()
-        )
-        
-        self.out_proj = nn.Linear(dim * 2, dim)
+        self.fusion_gate = AdaptiveGatedFusion(dim)
         # 细节注入强度参数 gamma
         self.gamma = nn.Parameter(torch.tensor(1.0))
 
@@ -130,23 +142,9 @@ class SFIB(nn.Module):
         h_spatial = self.forward_spatial(x_main, x_guide, edge_index)
         
         # --- Branch 3: Dual Interaction ---
-        # A. 提取高频残差 (反锐化掩模)
-        f_detail = h_spatial - h_freq
+        # 自适应通道门控融合
+        h_enhanced = self.fusion_gate(h_freq, h_spatial)
 
-        # B. 自适应细节注入权重
-        w_inject = self.node_attn(f_detail)  # 使用已有 MLP+Sigmoid
-        f_sharp = w_inject * f_detail
-
-        # C. 频域为基底，加权细节叠加
-        h_enhanced = h_freq + self.gamma * f_sharp
-
-        # 拼接：保持与增强后的基底对应
-        h_cat = torch.cat([h_enhanced, h_spatial], dim=1) # [N, 2C]
-        
-        # Global Avg/Std for Channel Attn (简化版)
-        # w_channel = self.channel_fc(h_cat.mean(0, keepdim=True)) ... 省略复杂实现
-        
-        # 4. Final Output (Res connection handled in block usually, or here)
-        out = self.out_proj(h_cat)
-        
+        # 输出改为融合后的特征 (保持残差)
+        out = h_enhanced
         return out + x_main # Block Residual
